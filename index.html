@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="uk" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Дашборд моніторингу проб води Сумської області (Вересень 2026)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        .badge-critical { background-color: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
+        .badge-warning { background-color: #fef3c7; color: #92400e; border: 1px solid #fbbf24; }
+        .badge-normal { background-color: #d1fae5; color: #065f46; border: 1px solid #34d399; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        #map { min-height: 550px; z-index: 10; width: 100%; height: 600px; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-full flex flex-col antialiased">
+
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-teal-600 p-2.5 rounded-xl shadow-inner flex items-center justify-center">
+                    <i class="fa-solid fa-droplet text-white text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">Екологічний моніторинг вод Сумщини</h1>
+                    <p class="text-xs text-slate-400">Результати польових проб (Вересень, 2026 р.) • ГО «НОВА Енергія»</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                <button onclick="switchTab('overview')" id="btn-overview" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-teal-600 text-white shadow">
+                    <i class="fa-solid fa-chart-pie mr-2"></i>Огляд показників
+                </button>
+                <button onclick="switchTab('mapview')" id="btn-mapview" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-slate-800 hover:bg-slate-700 text-slate-200">
+                    <i class="fa-solid fa-map-location-dot mr-2"></i>Карта проб
+                </button>
+                <button onclick="switchTab('registry')" id="btn-registry" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-slate-800 hover:bg-slate-700 text-slate-200">
+                    <i class="fa-solid fa-table-list mr-2"></i>Реєстр проб (20)
+                </button>
+                <button onclick="switchTab('risks')" id="btn-risks" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-slate-800 hover:bg-slate-700 text-slate-200">
+                    <i class="fa-solid fa-triangle-exclamation mr-2"></i>Воєнні ризики
+                </button>
+                <button onclick="switchTab('recommendations')" id="btn-recommendations" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-slate-800 hover:bg-slate-700 text-slate-200">
+                    <i class="fa-solid fa-shield-halved mr-2"></i>Рекомендації
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 overflow-y-auto">
+        
+        <!-- Tab 1: Overview -->
+        <div id="tab-overview" class="space-y-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Досліджено проб</p>
+                        <h3 class="text-3xl font-bold text-slate-900 mt-1">20</h3>
+                        <p class="text-xs text-slate-500 mt-1">у 10 територіальних громадах</p>
+                    </div>
+                    <div class="bg-blue-50 text-blue-600 p-4 rounded-xl text-xl"><i class="fa-solid fa-vials"></i></div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Зафіксовано перевищень</p>
+                        <h3 class="text-3xl font-bold text-red-600 mt-1">57</h3>
+                        <p class="text-xs text-slate-500 mt-1">ГДК / ДСанПіН у пробах</p>
+                    </div>
+                    <div class="bg-red-50 text-red-600 p-4 rounded-xl text-xl"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Критичний стан важких металів</p>
+                        <h3 class="text-3xl font-bold text-amber-600 mt-1">6 <span class="text-sm font-normal text-slate-500">проб</span></h3>
+                        <p class="text-xs text-slate-500 mt-1">Мідь (29 мг/л) та Хром (до 24 мг/л)</p>
+                    </div>
+                    <div class="bg-amber-50 text-amber-600 p-4 rounded-xl text-xl"><i class="fa-solid fa-radiation"></i></div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Типи джерел відбору</p>
+                        <div class="flex gap-3 mt-2">
+                            <span class="inline-flex items-center text-xs font-medium bg-blue-100 text-blue-800 px-2.5 py-1 rounded-md">Колодязі: 9</span>
+                            <span class="inline-flex items-center text-xs font-medium bg-teal-100 text-teal-800 px-2.5 py-1 rounded-md">Водойми: 11</span>
+                        </div>
+                    </div>
+                    <div class="bg-teal-50 text-teal-600 p-4 rounded-xl text-xl"><i class="fa-solid fa-water"></i></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+                    <h3 class="text-base font-bold text-slate-900 mb-1">Найчастіші перевищення нормативів за показниками</h3>
+                    <p class="text-xs text-slate-500 mb-4">Кількість зафіксованих перевищень ГДК / ДСанПіН із 20 проб</p>
+                    <div class="relative flex-1 min-h-[300px]">
+                        <canvas id="excessesChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+                    <h3 class="text-base font-bold text-slate-900 mb-1">Розподіл типів джерел та якість води</h3>
+                    <p class="text-xs text-slate-500 mb-4">Структура відібраних проб та рівень загроз</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                        <div class="relative h-[220px]">
+                            <canvas id="sourcesChart"></canvas>
+                        </div>
+                        <div class="space-y-3 text-sm">
+                            <div class="p-3 bg-red-50 rounded-xl border border-red-100">
+                                <span class="font-bold text-red-700 block text-xs uppercase tracking-wider">Фториди (F⁻)</span>
+                                <span class="text-slate-700">Перевищення у <strong>15 з 20</strong> проб (до 12 мг/л при нормі 1.5).</span>
+                            </div>
+                            <div class="p-3 bg-amber-50 rounded-xl border border-amber-100">
+                                <span class="font-bold text-amber-700 block text-xs uppercase tracking-wider">Залізо загальне (Fe)</span>
+                                <span class="text-slate-700">Перевищення у <strong>11 з 20</strong> проб (до 1.77 мг/л).</span>
+                            </div>
+                            <div class="p-3 bg-blue-50 rounded-xl border border-blue-100">
+                                <span class="font-bold text-blue-700 block text-xs uppercase tracking-wider">Жорсткість</span>
+                                <span class="text-slate-700">Екстремальні значення (до 2048 ppm у с. Кударі).</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-r from-red-900 to-slate-900 text-white p-6 rounded-2xl shadow-md">
+                <div class="flex items-start gap-4">
+                    <div class="bg-red-500 text-white p-3 rounded-xl text-2xl"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <div>
+                        <h4 class="text-lg font-bold">Головний екологічний висновок вересня 2026 року</h4>
+                        <p class="text-slate-300 text-sm mt-1 leading-relaxed">
+                            Моніторинг виявив катастрофічне забруднення води у Сумській області. Зокрема, зафіксовано рекордну концентрацію міді <strong>29 мг/л</strong> (у 29 000 разів вище рибогосподарської норми) у ставку біля с. Неплатине поряд із Качанівським ГПЗ, а також аномальні концентрації хрому <strong>(21–24 мг/л)</strong> у 5 точках (до 24 000 разів вище норми). Поблизу місць ведення бойових дій та ударів БПЛА спостерігаються значні перевищення азотної групи та фторидів.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Map View -->
+        <div id="tab-mapview" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900">Інтерактивна карта точок відбору проб води (Сумська область)</h3>
+                        <p class="text-xs text-slate-500">Натисніть на маркер на карті, щоб переглянути детальний опис проби, GPS-координати та виявлені перевищення</p>
+                    </div>
+                    <div class="flex items-center gap-3 text-xs">
+                        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-red-600 inline-block"></span> Критичний стан</span>
+                        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span> Помірне перевищення</span>
+                    </div>
+                </div>
+                <div id="map" class="w-full rounded-xl border border-slate-200 shadow-inner"></div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Registry -->
+        <div id="tab-registry" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900">Зведений реєстр польових проб води (20 точок)</h3>
+                        <p class="text-xs text-slate-500">Детальна інформація про громади, джерела, координати та результати аналізів</p>
+                    </div>
+                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                        <div class="relative flex-1 sm:w-64">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400"><i class="fa-solid fa-search"></i></span>
+                            <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Пошук громади, села..." class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                    <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
+                        <thead class="bg-slate-100 text-slate-700 font-semibold uppercase text-xs">
+                            <tr>
+                                <th class="px-4 py-3">№</th>
+                                <th class="px-4 py-3">Дата / Громада</th>
+                                <th class="px-4 py-3">Населений пункт</th>
+                                <th class="px-4 py-3">Тип джерела</th>
+                                <th class="px-4 py-3">GPS-координати</th>
+                                <th class="px-4 py-3">Ключові показники та проблеми</th>
+                                <th class="px-4 py-3 text-center">Дія</th>
+                            </tr>
+                        </thead>
+                        <tbody id="waterTableBody" class="divide-y divide-slate-200 bg-white">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Risks -->
+        <div id="tab-risks" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="text-lg font-bold text-slate-900 mb-1">Соціально-екологічний контекст та вплив бойових дій</h3>
+                <p class="text-xs text-slate-500 mb-6">Аналіз зв'язку між руйнуваннями, обстрілами та аномальним забрудненням водних джерел</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="p-5 rounded-2xl border border-red-200 bg-red-50/50 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold uppercase tracking-wider text-red-700 bg-red-100 px-2.5 py-1 rounded-md">Проба №1</span>
+                            <span class="text-xs font-semibold text-red-600">с. Неплатине</span>
+                        </div>
+                        <h4 class="font-bold text-slate-900">Ставок поблизу Качанівського ГПЗ</h4>
+                        <p class="text-sm text-slate-600 leading-relaxed">
+                            Найближча відкрита водойма до зон неодноразових обстрілів. Зафіксовано рекорди концентрацію міді <strong>29 мг/л</strong> та критично кислу реакцію <strong>(pH 4)</strong>. Вода забарвлена, замулена, з масляною плівкою. Потребує термінового арбітражного дослідження.
+                        </p>
+                    </div>
+
+                    <div class="p-5 rounded-2xl border border-amber-200 bg-amber-50/50 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold uppercase tracking-wider text-amber-700 bg-amber-100 px-2.5 py-1 rounded-md">Проба №2</span>
+                            <span class="text-xs font-semibold text-amber-600">с. Комиші</span>
+                        </div>
+                        <h4 class="font-bold text-slate-900">Приватна криниця біля нафтовидобутку</h4>
+                        <p class="text-sm text-slate-600 leading-relaxed">
+                            Власник самостійно повідомив про сторонній запах і гіркий присмак, використовуючи воду лише як технічну. Лабораторний аналіз підтвердив нітрати вище діапазону (>30 мг/л) та жорсткість понад 600 ppm. Приклад точного збігу органолептики з хімією.
+                        </p>
+                    </div>
+
+                    <div class="p-5 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-700 bg-slate-200 px-2.5 py-1 rounded-md">Проба №8</span>
+                            <span class="text-xs font-semibold text-slate-600">с. Гудими</span>
+                        </div>
+                        <h4 class="font-bold text-slate-900">Громадський колодязь біля місця вибуху «Шахеда»</h4>
+                        <p class="text-sm text-slate-600 leading-relaxed">
+                            Відбір за 30-40 м від місця прильоту. Вода містить залізо (1.77 мг/л), сульфати (HI) та жорсткість 668 ppm. Під час окупації та блекаутів цей колодязь був єдиним джерелом для понад 50 мешканців.
+                        </p>
+                    </div>
+
+                    <div class="p-5 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold uppercase tracking-wider text-teal-700 bg-teal-100 px-2.5 py-1 rounded-md">Проба №10</span>
+                            <span class="text-xs font-semibold text-teal-600">с. Мала Павлівка</span>
+                        </div>
+                        <h4 class="font-bold text-slate-900">Колодязь бригади ПСП</h4>
+                        <p class="text-sm text-slate-600 leading-relaxed">
+                            Джерелом користуються 15+ господарств, рятувальники ДСНС та «Охтирканафтогаз», вважаючи воду смачною. Аналіз виявив приховану катастрофічну загрозу — хром <strong>23 мг/л</strong> та екстремальний рівень фторидів.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 5: Recommendations -->
+        <div id="tab-recommendations" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Комплекс невідкладних заходів безпеки</h3>
+                    <p class="text-xs text-slate-500">Рекомендації на основі екологічного звіту Сумської області (Вересень 2026)</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="p-5 rounded-xl border border-red-200 bg-red-50/30 space-y-3">
+                        <div class="w-10 h-10 rounded-lg bg-red-600 text-white flex items-center justify-center font-bold text-lg">1</div>
+                        <h4 class="font-bold text-slate-900">Заборона вживання</h4>
+                        <p class="text-sm text-slate-600 leading-relaxed">
+                            Негайне припинення питного використання води з неперевірених джерел із високим вмістом токсичних домішок (хром, мідь, нітрати).
+                        </p>
+                    </div>
+
+                    <div class="p-5 rounded-xl border border-amber-200 bg-amber-50/30 space-y-3">
+                        <div class="w-10 h-10 rounded-lg bg-amber-600 text-white flex items-center justify-center font-bold text-lg">2</div>
+                        <h4 class="font-bold text-slate-900">Лабораторна верифікація</h4>
+                        <p class="text-sm text-slate-600 leading-relaxed">
+                            Проведення арбітражних проб в акредитованих лабораторіях Держпродспоживслужби та Центру контролю хвороб МОЗ для підтвердження аномальних показників.
+                        </p>
+                    </div>
+
+                    <div class="p-5 rounded-xl border border-teal-200 bg-teal-50/30 space-y-3">
+                        <div class="w-10 h-10 rounded-lg bg-teal-600 text-white flex items-center justify-center font-bold text-lg">3</div>
+                        <h4 class="font-bold text-slate-900">Методи очищення</h4>
+                        <p class="text-sm text-slate-600 leading-relaxed">
+                            Застосування іонообмінних фільтрів для пом'якшення та систем зворотного осмосу для видалення важких металів. <strong>Увага:</strong> кип'ятіння не видаляє важкі метали та фториди!
+                        </p>
+                    </div>
+                </div>
+
+                <div class="p-5 bg-slate-900 text-white rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div>
+                        <h5 class="font-bold text-base">Завантажити повний офіційний звіт (PDF)</h5>
+                        <p class="text-xs text-slate-400 mt-0.5">Звіт підготовлено ГО «НОВА ЕНЕРГІЯ» в рамках проєкту «Громадська оцінка ризиків для земель і вод...»</p>
+                    </div>
+                    <a href="https://drive.google.com/file/d/1PY7d467hUPcaJ9_zBSNiaH0kyV8R7SpS/view?usp=sharing" target="_blank" rel="noopener noreferrer" class="bg-teal-600 hover:bg-teal-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition shadow whitespace-nowrap inline-flex items-center">
+                        <i class="fa-solid fa-file-pdf mr-2"></i>Завантажити звіт (PDF)
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="customModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center space-x-3 text-teal-600">
+                <i class="fa-solid fa-circle-info text-2xl"></i>
+                <h3 class="text-lg font-bold text-slate-900">Інформація щодо проби</h3>
+            </div>
+            <p id="modalText" class="text-sm text-slate-600 leading-relaxed"></p>
+            <div class="flex justify-end pt-2">
+                <button onclick="closeModal()" class="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-medium hover:bg-slate-800 transition">Зрозуміло</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const waterSamples = [
+            { id: 1, date: "30.07.2026", community: "Комишанська", settlement: "с. Неплатине", type: "Поверхнева (ставок)", lat: 50.3345, lng: 34.6212, desc: "Поблизу Качанівського ГПЗ. pH 4, Мідь 29.0 мг/л (рекордне забруднення), масляна плівка.", status: "critical" },
+            { id: 2, date: "31.07.2026", community: "Комишанська", settlement: "с. Комиші", type: "Колодязь (криниця)", lat: 50.3280, lng: 34.5050, desc: "Поблизу нафтовидобутку. Нітрати та жорсткість HI (>600 ppm), сторонній запах.", status: "critical" },
+            { id: 3, date: "06.08.2026", community: "Недригайлівська", settlement: "сел. Терни", type: "Поверхнева (р. Терн)", lat: 50.9897, lng: 33.9723, desc: "Поблизу місця удару шахеда. Фториди 4.3 мг/л (перевищення у 5.7 раза).", status: "warning" },
+            { id: 4, date: "06.08.2026", community: "Недригайлівська", settlement: "с. Хоружівка", type: "Поверхнева (ставок)", lat: 50.9088, lng: 33.8369, desc: "Ставок «Панський». Фториди 10.5 мг/л (у 14 разів вище норми).", status: "warning" },
+            { id: 5, date: "11.08.2026", community: "Лебединська", settlement: "м. Лебедин", type: "Поверхнева (р. Вільшанка)", lat: 50.5988, lng: 34.5094, desc: "За 150-200 м від прильоту шахеда. Кисле середовище, амоній 1.61 мг/л, фториди 3.2 мг/л.", status: "warning" },
+            { id: 6, date: "17.08.2026", community: "Комишанська", settlement: "с. Кударі", type: "Поверхнева (ставок біля села)", lat: 50.3080, lng: 34.5520, desc: "За 50-80 м від прильоту реактивного снаряда. Жорсткість 2048 ppm, масляна плівка.", status: "critical" },
+            { id: 7, date: "17.08.2026", community: "Комишанська", settlement: "с. Кударі", type: "Поверхнева (ставок у селі)", lat: 50.3060, lng: 34.5490, desc: "Кисле середовище (pH <5.1), залізо 0.25 мг/л.", status: "warning" },
+            { id: 8, date: "18.08.2026", community: "Андріяшівська", settlement: "с. Гудими", type: "Громадський колодязь", lat: 50.5723, lng: 33.3175, desc: "30-40 м від прильоту шахеда. Залізо 1.77 мг/л, сульфати HI, жорсткість 668 ppm.", status: "critical" },
+            { id: 9, date: "21.08.2026", community: "Комишанська", settlement: "с. Мала Павлівка", type: "Колодязь (вул. Пріщенка)", lat: 50.2910, lng: 34.5580, desc: "Кисле середовище, нітрати HI (>30 мг/л), залізо 0.62 мг/л, фториди 5.6 мг/л.", status: "critical" },
+            { id: 10, date: "21.08.2026", community: "Комишанська", settlement: "с. Мала Павлівка", type: "Колодязь (бригада ПСП)", lat: 50.2850, lng: 34.5480, desc: "Користуються 15+ господарств і ДСНС. Хром 23 мг/л (у 460 разів перевищення!), фториди HI.", status: "critical" },
+            { id: 11, date: "24.08.2026", community: "Сумська", settlement: "м. Суми", type: "Поверхнева (р. Псел)", lat: 50.9120, lng: 34.8200, desc: "Поблизу ТРЦ «Епіцентр», ураженого 16.07.2026. Залізо 0.72 мг/л, фториди 7.7 мг/л.", status: "warning" },
+            { id: 12, date: "24.08.2026", community: "Тростянецька", settlement: "м. Тростянець", type: "Громадський колодязь", lat: 50.4788, lng: 34.9632, desc: "Залізо 1.63 мг/л (у 8.1 раза вище норми), жорсткість 374 ppm.", status: "warning" },
+            { id: 13, date: "24.08.2026", community: "Тростянецька", settlement: "м. Тростянець", type: "Поверхнева (р. Боромля)", lat: 50.4781, lng: 34.9682, desc: "Амоній 1.54 мг/л, нітрити 0.10 мг/л, залізо 0.34 мг/л, фториди 2.8 мг/л.", status: "warning" },
+            { id: 14, date: "25.08.2026", community: "Білопільська", settlement: "м. Білопілля", type: "Громадський колодязь", lat: 51.1357, lng: 34.2706, desc: "Залізо 0.71 мг/л, фториди 5.0 мг/л, Хром 22 мг/л (у 440 разів вище норми).", status: "critical" },
+            { id: 15, date: "25.08.2026", community: "Білопільська", settlement: "м. Білопілля", type: "Громадський колодязь", lat: 51.1365, lng: 34.2715, desc: "Залізо 1.58 мг/л, фториди HI, жорсткість 409 ppm.", status: "critical" },
+            { id: 16, date: "25.08.2026", community: "Білопільська", settlement: "м. Білопілля", type: "Приватний шахтний колодязь", lat: 51.1430, lng: 34.2780, desc: "Залізо 0.72 мг/л, фториди HI (понад робочий діапазон).", status: "critical" },
+            { id: 17, date: "25.08.2026", community: "Білопільська", settlement: "м. Білопілля", type: "Поверхнева (р. Вир)", lat: 51.1430, lng: 34.2777, desc: "Амоній 6.17 мг/л (фекальне забруднення у 12.3 раза), Хром 24 мг/л (24000 р. рибогосп.).", status: "critical" },
+            { id: 18, date: "26.08.2026", community: "Охтирська ТГ", settlement: "м. Охтирка", type: "Зелене озеро", lat: 50.2972, lng: 34.8852, desc: "Сульфати 150 mg/l, мідь 0.02 мг/л, фториди 2.6 мг/л, Хром 21 мг/л.", status: "critical" },
+            { id: 19, date: "26.08.2026", community: "Чернеччинська ТГ", settlement: "с. Чернеччина", type: "Затока р. Ворскли", lat: 50.3140, lng: 34.8347, desc: "Цвітіння води, сульфати 143 мг/л, фториди 9.3 мг/л.", status: "warning" },
+            { id: 20, date: "26.08.2026", community: "Грунська ТГ", settlement: "с. Молодецьке", type: "Приватний колодязь", lat: 50.3213, lng: 34.6449, desc: "Відсутній централізований водогін. Фториди HI, жорсткість HI, Хром 21 мг/л.", status: "critical" },
+        ];
+
+        let map = null;
+
+        function renderTable(data) {
+            const tbody = document.getElementById('waterTableBody');
+            tbody.innerHTML = '';
+            data.forEach(item => {
+                let badgeClass = item.status === 'critical' ? 'badge-critical' : 'badge-warning';
+                let statusText = item.status === 'critical' ? 'Критично / Небезпечно' : 'Помірне перевищення';
+                
+                let tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors";
+                tr.innerHTML = `
+                    <td class="px-4 py-3 font-semibold text-slate-900">№${item.id}</td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                        <div class="font-medium text-slate-900">${item.community}</div>
+                        <div class="text-xs text-slate-500">${item.date}</div>
+                    </td>
+                    <td class="px-4 py-3 font-medium text-slate-900">${item.settlement}</td>
+                    <td class="px-4 py-3 text-slate-600 text-xs">${item.type}</td>
+                    <td class="px-4 py-3 text-xs text-slate-500 font-mono">${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}</td>
+                    <td class="px-4 py-3">
+                        <p class="text-xs text-slate-700 line-clamp-2">${item.desc}</p>
+                        <span class="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-semibold ${badgeClass}">${statusText}</span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <button onclick="showDetails(${item.id})" class="bg-slate-100 hover:bg-teal-600 hover:text-white text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition shadow-sm">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filterTable() {
+            let query = document.getElementById('searchInput').value.toLowerCase();
+            let filtered = waterSamples.filter(s => 
+                s.community.toLowerCase().includes(query) || 
+                s.settlement.toLowerCase().includes(query) || 
+                s.type.toLowerCase().includes(query) ||
+                s.desc.toLowerCase().includes(query)
+            );
+            renderTable(filtered);
+        }
+
+        function showDetails(id) {
+            let sample = waterSamples.find(s => s.id === id);
+            if (!sample) return;
+            let text = `Проба №${sample.id} (${sample.settlement}, ${sample.community} громада)\nДата відбору: ${sample.date}\nТип джерела: ${sample.type}\nКоординати: ${sample.lat.toFixed(4)}, ${sample.lng.toFixed(4)}\n\nРезультати та примітки:\n${sample.desc}`;
+            document.getElementById('modalText').innerText = text;
+            document.getElementById('customModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('customModal').classList.add('hidden');
+        }
+
+        function switchTab(tabName) {
+            const tabs = ['overview', 'mapview', 'registry', 'risks', 'recommendations'];
+            tabs.forEach(t => {
+                document.getElementById('tab-' + t).classList.add('hidden');
+                let btn = document.getElementById('btn-' + t);
+                btn.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-slate-800 hover:bg-slate-700 text-slate-200";
+            });
+            document.getElementById('tab-' + tabName).classList.remove('hidden');
+            let activeBtn = document.getElementById('btn-' + tabName);
+            activeBtn.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-teal-600 text-white shadow";
+
+            if (tabName === 'mapview') {
+                setTimeout(() => {
+                    if (!map) {
+                        initMap();
+                    } else {
+                        map.invalidateSize();
+                    }
+                }, 200);
+            }
+        }
+
+        function initMap() {
+            if (map) return;
+            
+            // Center strictly on Sumy Oblast
+            map = L.map('map').setView([50.7, 34.2], 8);
+
+            // Esri World Gray Canvas tiles (100% free, reliable, no API keys or 403 blocks)
+            L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 16,
+                attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
+            }).addTo(map);
+
+            waterSamples.forEach(sample => {
+                let colorHex = sample.status === 'critical' ? '#dc2626' : '#d97706';
+                let htmlIcon = `<div style="background-color: ${colorHex}; width: 28px; height: 28px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: bold;">${sample.id}</div>`;
+                
+                let customIcon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: htmlIcon,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14]
+                });
+
+                let marker = L.marker([sample.lat, sample.lng], { icon: customIcon }).addTo(map);
+
+                let popupContent = `
+                    <div style="font-family: 'Inter', sans-serif; font-size: 13px; max-width: 240px;">
+                        <strong style="color: #0f172a; font-size: 14px;">Проба №${sample.id}: ${sample.settlement}</strong><br>
+                        <span style="color: #64748b; font-size: 11px;">${sample.community} громада • ${sample.date}</span><br>
+                        <div style="margin: 6px 0 4px 0; background: #f8fafc; padding: 6px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                            <b>Тип:</b> ${sample.type}<br>
+                            <b>Опис:</b> ${sample.desc}
+                        </div>
+                        <button onclick="showDetails(${sample.id})" style="background: #0d9488; color: white; border: none; padding: 5px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; width: 100%; margin-top: 4px; font-weight: 500;">Детальна інформація</button>
+                    </div>
+                `;
+                marker.bindPopup(popupContent);
+            });
+        }
+
+        window.onload = function() {
+            renderTable(waterSamples);
+
+            const ctxBar = document.getElementById('excessesChart').getContext('2d');
+            new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: ['Фториди (F⁻)', 'Залізо (Fe)', 'Жорсткість', 'Хром (Cr)', 'рН (кисле сер.)', 'Амоній (NH₄⁺)', 'Сульфати (SO₄²⁻)', 'Нітрати (NO₃⁻)', 'Мідь (Cu)', 'Нітрити (NO₂⁻)'],
+                    datasets: [{
+                        label: 'Кількість зафіксованих перевищень (з 20 проб)',
+                        data: [15, 11, 9, 5, 5, 3, 3, 3, 2, 1],
+                        backgroundColor: [
+                            '#dc2626', '#ea580c', '#f59e0b', '#d97706', '#b45309', 
+                            '#3b82f6', '#3b82f6', '#3b82f6', '#0d9488', '#0d9488'
+                        ],
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, max: 16, grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            const ctxPie = document.getElementById('sourcesChart').getContext('2d');
+            new Chart(ctxPie, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Колодязі / криниці', 'Поверхневі водойми'],
+                    datasets: [{
+                        data: [9, 11],
+                        backgroundColor: ['#2563eb', '#0d9488'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { family: 'Inter', size: 11 } } }
+                    },
+                    cutout: '70%'
+                }
+            });
+        };
+    </script>
+</body>
+</html>
